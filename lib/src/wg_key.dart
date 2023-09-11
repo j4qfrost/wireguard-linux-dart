@@ -1,84 +1,75 @@
 import 'dart:ffi';
-import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
+import 'package:ffi/ffi.dart';
 
 import '../native/native_wireguard_library.dart' as native;
 
-class _WGKey {
-  int address;
-  static const int _length = 32;
-  static final int _strLength = (sizeOf<UnsignedChar>() * _length + 2) ~/ 3 * 4;
+interface class WGKey {
+  final Pointer<Uint8> pointer;
+  static const int length = 32;
+  static final int strLength = 44;
 
-  final Uint8List _data;
-  static final NativeFinalizer _finalizer = NativeFinalizer(malloc.nativeFree);
+  static final NativeFinalizer _finalizer = NativeFinalizer(calloc.nativeFree);
 
-  int get length => (address == 0) ? 0 : _data.length;
-  Uint8List? get data => (address == 0) ? null : _data;
+  const WGKey(this.pointer);
 
-  _WGKey(this.address, this._data);
+  Uint8List get data => pointer.cast<Uint8>().asTypedList(length);
 
   @override
   String toString() {
-    final Pointer<Char> str = malloc.allocate(_strLength);
-    native.key_to_string(Pointer.fromAddress(address), str);
+    final Pointer<Char> str = malloc.allocate(strLength);
+    native.wg_key_to_base64(str, pointer);
 
-    final String res = String.fromCharCodes(
-        [for (int i = 0; i < _strLength; i++) str.elementAt(i).value]);
+    final String res =
+        String.fromCharCodes([for (int i = 0; i < strLength; i++) str[i]]);
     malloc.free(str);
     return res;
   }
 
-  factory _WGKey.fromString(String dartStr) {
-    Pointer<Char> str = malloc.allocate(_strLength);
-    for (int i = 0; i < _strLength; i++) {
+  factory WGKey.fromString(String dartStr) {
+    final Pointer<Char> str = calloc.allocate(strLength);
+    for (int i = 0; i < strLength; i++) {
       str[i] = dartStr.codeUnitAt(i);
     }
-    Pointer<Uint8> p = malloc.allocate(_length);
+    final Pointer<Uint8> p = calloc.allocate(length);
     if (p == nullptr) {
       throw OutOfMemoryError();
     }
-    native.key_from_string(str, p);
-    malloc.free(str);
-    return _WGKey(p.address, p.asTypedList(_length));
+    native.wg_key_from_base64(p, str);
+    calloc.free(str);
+    return WGKey(p);
   }
 
   void free() {
-    malloc.free(Pointer.fromAddress(address));
-    address = 0;
+    calloc.free(pointer);
     _finalizer.detach(this);
   }
 }
 
-final class PrivateKey extends _WGKey {
-  PrivateKey(int newAddress, Uint8List data) : super(newAddress, data);
+final class PrivateKey extends WGKey {
+  const PrivateKey(Pointer<Uint8> pointer) : super(pointer);
 
   factory PrivateKey.fromString(String str) {
-    _WGKey key = _WGKey.fromString(str);
-    return PrivateKey(key.address, key.data!);
+    return PrivateKey(WGKey.fromString(str).pointer);
   }
 
   factory PrivateKey.generate() {
-    final Pointer<UnsignedChar> p =
-        malloc.allocate(sizeOf<UnsignedChar>() * _WGKey._length);
-    native.generate_private_key(p);
-
-    return PrivateKey(p.address, p.cast<Uint8>().asTypedList(_WGKey._length));
+    final Pointer<Uint8> p = calloc.allocate(sizeOf<Uint8>() * WGKey.length);
+    native.wg_generate_private_key(p);
+    return PrivateKey(p);
   }
 }
 
-final class PublicKey extends _WGKey {
-  PublicKey(int newAddress, Uint8List data) : super(newAddress, data);
+final class PublicKey extends WGKey {
+  const PublicKey(Pointer<Uint8> pointer) : super(pointer);
 
   factory PublicKey.fromString(String str) {
-    _WGKey key = _WGKey.fromString(str);
-    return PublicKey(key.address, key.data!);
+    return PublicKey(WGKey.fromString(str).pointer);
   }
 
-  factory PublicKey.generate(int address) {
-    final Pointer<UnsignedChar> privateKey = Pointer.fromAddress(address);
-    final Pointer<UnsignedChar> p =
-        malloc.allocate(sizeOf<UnsignedChar>() * _WGKey._length);
-    native.generate_public_key(privateKey, p);
-    return PublicKey(p.address, p.cast<Uint8>().asTypedList(_WGKey._length));
+  factory PublicKey.generate(Pointer<Uint8> privateKey) {
+    final Pointer<Uint8> p = calloc.allocate(sizeOf<Uint8>() * WGKey.length);
+    native.wg_generate_public_key(p, privateKey);
+    return PublicKey(p);
   }
 }

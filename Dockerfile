@@ -2,7 +2,11 @@
 # Specify the Dart SDK base image version using dart:<version> (ex: dart:2.14)
 FROM bitnami/git:latest
 
-RUN apt-get update -y && apt-get install -y unzip clang cmake ninja-build pkg-config libgtk-3-dev iproute2
+RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y unzip clang cmake ninja-build pkg-config \
+    libgtk-3-dev iproute2 iptables-persistent openresolv
+
+RUN git clone https://git.zx2c4.com/wireguard-tools/ && cd wireguard-tools/src && \
+    make && make install
 
 ENV PATH $PATH:$PWD/flutter/bin
 
@@ -20,4 +24,4 @@ RUN dart pub get --offline
 
 RUN dart pub run ffigen --config ffigen.yaml
 
-CMD ["/bin/bash"]
+EXPOSE 51820/udp

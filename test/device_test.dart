@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:wireguard_linux/src/device.dart';
 import 'package:test/test.dart';
 import 'package:wireguard_linux/src/wg_key.dart';
@@ -8,37 +10,30 @@ void main() {
 
   tearDownAll(() {
     for (String name in deviceNames) {
-      Device.deleteDevice(name);
+      try {
+        Device.deleteDevice(name);
+      } on PathNotFoundException catch (e) {
+        print(e);
+      }
     }
-  });
-
-  test('Add client device', () {
-    final String name = deviceNames[0];
-    final PrivateKey privateKey = PrivateKey.generate();
-    final ClientDevice device = ClientDevice.addDevice(name, privateKey);
-
-    expect(device.name.codeUnits, name.codeUnits);
-    expect(device.privateKey, privateKey.data);
   });
 
   test('Connect to server', () async {
     final String name = deviceNames[1];
-    final PrivateKey privateKey = PrivateKey.generate();
-    final PublicKey publicKey = PublicKey.generate(privateKey.address);
-    final ClientDevice device = ClientDevice.addDevice(name, privateKey);
+    final PrivateKey privateKey = PrivateKey.fromString('');
+    final PublicKey publicKey = PublicKey.fromString('');
+    const String dns = '';
+    const String addr = '';
+    final ClientDevice device =
+        ClientDevice.addDevice(name, privateKey, 51820, addr: addr, dns: dns);
 
     final String before =
-        (await http.get(Uri.parse('https://api.ipify.org?format=json'))).body;
-    device.connect(publicKey.address, '195.181.162.163', 51820);
-    // print(device.firstPeer.publicKey);
-    // print(device.firstPeer.presharedKey);
-    // print(device.lastPeer.publicKey);
-    // print(device.lastPeer.presharedKey);
-    // expect(device.lastPeer.publicKey, publicKey.data!);
-    // device.setDevice();
-    Device.listDevices();
-    print(device.firstPeer.publicKey);
+        (await http.get(Uri.parse('https://api.ipify.org'))).body;
+    device.connect('', 51820, publicKey, gateway: '172.17.0.1', device: 'eth0');
+
     final String after =
-        (await http.get(Uri.parse('https://api.ipify.org?format=json'))).body;
+        (await http.get(Uri.parse('https://api.ipify.org'))).body;
+
+    expect(after, isNot(before));
   });
 }
