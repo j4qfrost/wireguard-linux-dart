@@ -11,6 +11,7 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 const packageName = 'wireguard_linux';
 
 void main(List<String> args) async {
+  print(args);
   final buildConfig = await BuildConfig.fromArgs(args);
   final buildOutput = BuildOutput();
 
