@@ -26,8 +26,10 @@ abstract interface class Device {
 
   int get listenPort => _inner.ref.listen_port;
 
-  Peer get firstPeer => Peer(_inner.ref.first_peer);
-  Peer get lastPeer => Peer(_inner.ref.last_peer);
+  Peer? get firstPeer =>
+      _inner.ref.first_peer.address == 0 ? null : Peer(_inner.ref.first_peer);
+  Peer? get lastPeer =>
+      _inner.ref.last_peer.address == 0 ? null : Peer(_inner.ref.last_peer);
 
   Device(this._inner) {
     privateKey = PrivateKey(_inner
@@ -104,10 +106,6 @@ class ClientDevice extends Device {
       throw 'Unable to add device';
     }
 
-    if (native.wg_set_device(device) < 0) {
-      throw 'Unable to set device';
-    }
-
     malloc.free(str);
 
     if (addr != null) {
@@ -160,7 +158,11 @@ class ClientDevice extends Device {
       _inner.ref.last_peer = peer._inner;
     }
 
-    native.wg_set_device(_inner);
+    final int ret = native.wg_set_device(_inner);
+
+    if (ret != 0) {
+      throw ret;
+    }
   }
 
   void connect(String ip, int port, PublicKey key,
@@ -178,7 +180,6 @@ class ClientDevice extends Device {
     } else {
       route();
     }
-    print(File('/etc/resolv.conf').readAsStringSync());
   }
 
   void route([String allowedIp = '0.0.0.0/0']) {
@@ -221,7 +222,11 @@ class Peer {
   PrivateKey get presharedKey =>
       PrivateKey(_inner.cast<Uint8>().elementAt(sizeOf<Int32>() + 32));
 
+  native.wg_endpoint get endpoint => _inner.ref.endpoint;
+
   Peer get next => Peer(_inner.ref.next_peer);
+
+  int get address => _inner.address;
 
   const Peer(this._inner);
 
@@ -232,13 +237,13 @@ class Peer {
   }
 
   factory Peer.create(int port, String ip, PublicKey pub) {
-    final Pointer<native.sockaddr_in> destAddr =
-        calloc.allocate(sizeOf<native.sockaddr_in>());
-    destAddr.ref.sin_family = 2; // AF_INET
+    final Pointer<native.wg_endpoint> destAddr =
+        calloc.allocate(sizeOf<native.wg_endpoint>());
 
-    destAddr.ref.sin_port = port << 8 | port >> 8;
+    destAddr.ref.addr4.sin_family = 2; // AF_INET
+    destAddr.ref.addr4.sin_port = port << 8 | port >> 8;
     final Uint8List raw = InternetAddress(ip).rawAddress;
-    destAddr.ref.sin_addr.s_addr =
+    destAddr.ref.addr4.sin_addr.s_addr =
         raw[3] << 24 | raw[2] << 16 | raw[1] << 8 | raw[0];
 
     final Pointer<native.wg_allowedip> allowedIp =
@@ -252,10 +257,11 @@ class Peer {
     peer.ref.flags = native.wg_peer_flags.WGPEER_HAS_PUBLIC_KEY |
         native.wg_peer_flags.WGPEER_REPLACE_ALLOWEDIPS |
         native.wg_peer_flags.WGPEER_HAS_PERSISTENT_KEEPALIVE_INTERVAL;
-    peer.ref.endpoint.addr4 = destAddr.ref;
+
+    peer.ref.endpoint = destAddr.ref;
     peer.ref.first_allowedip = allowedIp;
     peer.ref.last_allowedip = allowedIp;
-    peer.ref.persistent_keepalive_interval = 30;
+    peer.ref.persistent_keepalive_interval = 60;
 
     for (int i = 0; i < 32; i++) {
       peer.ref.public_key[i] = pub.pointer[i];

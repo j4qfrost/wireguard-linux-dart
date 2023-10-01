@@ -13,7 +13,7 @@ ENV PATH $PATH:$PWD/flutter/bin
 # Download and extract Flutter SDK
 RUN git clone -b master https://github.com/flutter/flutter.git && flutter doctor
 
-RUN mkdir /wireguard_linux && cd /wireguard_linux 
+# RUN mkdir /wireguard_linux && cd /wireguard_linux 
 
 WORKDIR /wireguard_linux
 COPY pubspec.* ./
@@ -22,6 +22,6 @@ RUN dart pub get
 COPY . .
 RUN dart pub get --offline
 
-RUN dart pub run ffigen --config ffigen.yaml
+# RUN dart pub run ffigen --config ffigen.yaml
 
 EXPOSE 51820/udp

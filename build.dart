@@ -8,14 +8,20 @@ import 'package:logging/logging.dart';
 import 'package:native_assets_cli/native_assets_cli.dart';
 import 'package:native_toolchain_c/native_toolchain_c.dart';
 
-const packageName = 'wireguard_linux';
+import 'package:ffigen/ffigen.dart' as ffigen;
 
+const String packageName = 'wireguard_linux';
 void main(List<String> args) async {
-  print(args);
-  final buildConfig = await BuildConfig.fromArgs(args);
-  final buildOutput = BuildOutput();
+  final BuildConfig buildConfig = await BuildConfig.fromArgs(args);
 
-  final cbuilder = CBuilder.library(
+  final ffigen.Config ffiConfig = ffigen.Config.fromFile(
+      File.fromUri(buildConfig.packageRoot.resolve('ffigen.yaml')));
+  final ffigen.Library ffiLib = ffigen.parse(ffiConfig);
+  ffiLib.generateFile(File.fromUri(Uri.parse(ffiConfig.output)));
+
+  final BuildOutput buildOutput = BuildOutput();
+
+  final CBuilder cbuilder = CBuilder.library(
     name: packageName,
     assetId: 'package:$packageName/native/native_wireguard_library.dart',
     sources: [

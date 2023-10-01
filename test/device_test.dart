@@ -6,12 +6,12 @@ import 'package:wireguard_linux/src/wg_key.dart';
 import 'package:http/http.dart' as http;
 
 void main() {
-  const List<String> deviceNames = ['foobar', 'foobar1'];
+  const List<String> deviceNames = ['foobar'];
 
   tearDownAll(() {
     for (String name in deviceNames) {
       try {
-        Device.deleteDevice(name);
+        // Device.deleteDevice(name);
       } on PathNotFoundException catch (e) {
         print(e);
       }
@@ -19,7 +19,7 @@ void main() {
   });
 
   test('Connect to server', () async {
-    final String name = deviceNames[1];
+    final String name = deviceNames[0];
     final PrivateKey privateKey = PrivateKey.fromString('');
     final PublicKey publicKey = PublicKey.fromString('');
     const String dns = '';
@@ -31,6 +31,7 @@ void main() {
         (await http.get(Uri.parse('https://api.ipify.org'))).body;
     device.connect('', 51820, publicKey, gateway: '172.17.0.1', device: 'eth0');
 
+    await Future.delayed(Duration(seconds: 15));
     final String after =
         (await http.get(Uri.parse('https://api.ipify.org'))).body;
 
